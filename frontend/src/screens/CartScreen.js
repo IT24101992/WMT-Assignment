@@ -38,7 +38,7 @@ export default function CartScreen({ navigation }) {
       setLoading(true);
       const data = await fetchCart();
       setCart(data);
-      setSelectedItemIds((data?.items || []).map((item) => item._id));
+      setSelectedItemIds([]);
     } catch (e) {
       console.log(e);
     } finally {
