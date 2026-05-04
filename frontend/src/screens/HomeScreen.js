@@ -69,6 +69,19 @@ export default function HomeScreen({ navigation }) {
         ...(Array.isArray(product.sizes) ? product.sizes : []),
     ].filter(Boolean).join(' ').toLowerCase();
 
+    const firstImage = (images) => {
+        if (!Array.isArray(images) || images.length === 0) return '';
+        return images.map((image) => {
+            if (typeof image === 'string') return image;
+            return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
+        }).find(Boolean) || '';
+    };
+
+    const getProductImage = (product) => (
+        firstImage([product?.imageUrl, product?.imageURL, product?.image, product?.thumbnail, ...(product?.images || [])]) ||
+        'https://via.placeholder.com/500x650?text=LUSH'
+    );
+
     const loadProducts = async () => {
         try {
             const data = await fetchProducts();
@@ -680,7 +693,7 @@ export default function HomeScreen({ navigation }) {
                                 activeOpacity={0.86}
                             >
                                 <Image
-                                    source={{ uri: item.imageUrl || 'https://via.placeholder.com/200' }}
+                                    source={{ uri: getProductImage(item) }}
                                     style={styles.showcaseImage}
                                     resizeMode="cover"
                                 />
@@ -769,7 +782,7 @@ export default function HomeScreen({ navigation }) {
                                 onPress={() => navigation.navigate('ProductDetails', { productId: item._id })}
                             >
                                 <Image
-                                    source={{ uri: item.imageUrl || 'https://via.placeholder.com/200' }}
+                                    source={{ uri: getProductImage(item) }}
                                     style={styles.recentImage}
                                     resizeMode="cover"
                                 />
@@ -794,7 +807,7 @@ export default function HomeScreen({ navigation }) {
             >
                 <View style={styles.imageWrap}>
                     <Image
-                        source={{ uri: item.imageUrl || 'https://via.placeholder.com/200' }}
+                        source={{ uri: getProductImage(item) }}
                         style={[styles.image, { height: productImageHeight }]}
                     />
                     {discountPercent > 0 ? (

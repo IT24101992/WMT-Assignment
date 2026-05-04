@@ -16,10 +16,14 @@ const toValidPrice = (price) => {
   return Number.isFinite(value) && value >= 0 ? value : 0;
 };
 
+const imageValue = (image) => {
+  if (typeof image === 'string') return image;
+  return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
+};
+
 const firstImage = (images) => {
   if (!Array.isArray(images) || images.length === 0) return '';
-  const image = images[0];
-  return image?.url || image?.src || image;
+  return images.map(imageValue).find(Boolean) || '';
 };
 
 const ORDER_STATUSES = ['Pending', 'Order Placed', 'Order Cancelled'];
@@ -161,7 +165,7 @@ router.post('/', protect, async (req, res) => {
       cleanedOrderItems.push({
         name: product.name,
         qty: quantity,
-        image: product.imageUrl || firstImage(product.images),
+        image: imageValue(product.imageUrl) || imageValue(product.imageURL) || imageValue(product.image) || firstImage(product.images),
         price,
         size: item.size || '',
         product: product._id,

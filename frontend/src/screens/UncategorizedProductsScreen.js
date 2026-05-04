@@ -21,12 +21,13 @@ const showAlert = (title, message) => {
 };
 
 const getProductImage = (item) => {
-  if (Array.isArray(item.images) && item.images.length > 0) {
-    const image = item.images[0];
-    return image?.url || image?.src || image;
-  }
+  const images = [item?.imageUrl, item?.imageURL, item?.image, item?.thumbnail, ...(item?.images || [])];
+  const foundImage = images.map((image) => {
+    if (typeof image === 'string') return image;
+    return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
+  }).find(Boolean);
 
-  return item.imageUrl || 'https://via.placeholder.com/500x650?text=LUSH';
+  return foundImage || 'https://via.placeholder.com/500x650?text=LUSH';
 };
 
 export default function UncategorizedProductsScreen({ navigation }) {

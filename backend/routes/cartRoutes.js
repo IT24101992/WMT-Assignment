@@ -25,10 +25,14 @@ const getCategoryId = (category) => {
     return category.toString();
 };
 
+const imageValue = (image) => {
+    if (typeof image === 'string') return image;
+    return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
+};
+
 const firstImage = (images) => {
     if (!Array.isArray(images) || images.length === 0) return '';
-    const image = images[0];
-    return image?.url || image?.src || image?.imageUrl || image?.image || image;
+    return images.map(imageValue).find(Boolean) || '';
 };
 
 const normalizeProduct = (product, categoryMap) => {
@@ -41,10 +45,10 @@ const normalizeProduct = (product, categoryMap) => {
     obj.size = obj.size || obj.sizes || [];
     obj.sizes = obj.sizes || obj.size || [];
     obj.imageUrl = (
-        obj.imageUrl ||
-        obj.imageURL ||
-        obj.image ||
-        obj.thumbnail ||
+        imageValue(obj.imageUrl) ||
+        imageValue(obj.imageURL) ||
+        imageValue(obj.image) ||
+        imageValue(obj.thumbnail) ||
         firstImage(obj.images) ||
         'https://via.placeholder.com/300x300?text=No+Image'
     );
@@ -138,9 +142,14 @@ router.get('/admin/all', protect, admin, async (req, res) => {
             .populate('items.product')
             .sort({ updatedAt: -1 });
 
-        const customerCarts = carts.filter((cart) => cart.user && cart.user.isAdmin !== true);
+        const customerCarts = carts.filter((cart) => (
+            cart.user &&
+            cart.user.isAdmin !== true &&
+            Array.isArray(cart.items) &&
+            cart.items.some((item) => item.product && Number(item.quantity || 0) > 0)
+        ));
         const response = await Promise.all(customerCarts.map(async (cart) => toResponseCart(cart)));
-        res.json(response.filter(Boolean));
+        res.json(response.filter((cart) => cart && cart.items.length > 0));
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

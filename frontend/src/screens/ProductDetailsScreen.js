@@ -47,8 +47,17 @@ const isNewArrival = (product) => {
     return Number.isFinite(createdTime) && createdTime >= oneDayAgo;
 };
 
+const firstImage = (images) => {
+    if (!Array.isArray(images) || images.length === 0) return '';
+    return images.map((image) => {
+        if (typeof image === 'string') return image;
+        return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
+    }).find(Boolean) || '';
+};
+
 const getProductImage = (product) => (
-    product?.imageUrl || product?.images?.[0]?.url || product?.images?.[0] || 'https://via.placeholder.com/300'
+    firstImage([product?.imageUrl, product?.imageURL, product?.image, product?.thumbnail, ...(product?.images || [])]) ||
+    'https://via.placeholder.com/500x650?text=LUSH'
 );
 
 const RECENTLY_VIEWED_KEY = 'recentlyViewed';

@@ -13,6 +13,19 @@ const showAlert = (title, message) => {
     }
 };
 
+const firstImage = (images) => {
+    if (!Array.isArray(images) || images.length === 0) return '';
+    return images.map((image) => {
+        if (typeof image === 'string') return image;
+        return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
+    }).find(Boolean) || '';
+};
+
+const getProductImage = (product) => (
+    firstImage([product?.imageUrl, product?.imageURL, product?.image, product?.thumbnail, ...(product?.images || [])]) ||
+    ''
+);
+
 export default function EditProductScreen({ route, navigation }) {
     const { productId } = route.params;
 
@@ -40,11 +53,7 @@ export default function EditProductScreen({ route, navigation }) {
                 const sizeData = data.size || data.sizes || [];
                 setSize(Array.isArray(sizeData) ? sizeData.join(', ') : String(sizeData));
 
-                const img = data.imageUrl ||
-                    data.images?.[0]?.url ||
-                    (typeof data.images?.[0] === 'string' ? data.images[0] : '') ||
-                    '';
-                setImageUrl(img);
+                setImageUrl(getProductImage(data));
 
             } catch (_e) {
                 showAlert('Error', 'Failed to load product');

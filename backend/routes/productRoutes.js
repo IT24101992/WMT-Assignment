@@ -5,10 +5,14 @@ const { protect, admin } = require('../middleware/auth');
 
 const router = express.Router();
 
+const imageValue = (image) => {
+    if (typeof image === 'string') return image;
+    return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
+};
+
 const firstImage = (images) => {
     if (!Array.isArray(images) || images.length === 0) return '';
-    const image = images[0];
-    return image?.url || image?.src || image;
+    return images.map(imageValue).find(Boolean) || '';
 };
 
 const getCategoryId = (category) => {
@@ -56,7 +60,14 @@ const normalize = (product, categoryMap = new Map()) => {
 
     obj.size = obj.size || obj.sizes || [];
     obj.sizes = obj.sizes || obj.size || [];
-    obj.imageUrl = obj.imageUrl || firstImage(obj.images) || 'https://via.placeholder.com/300x300?text=No+Image';
+    obj.imageUrl = (
+        imageValue(obj.imageUrl) ||
+        imageValue(obj.imageURL) ||
+        imageValue(obj.image) ||
+        imageValue(obj.thumbnail) ||
+        firstImage(obj.images) ||
+        'https://via.placeholder.com/300x300?text=No+Image'
+    );
     obj.images = obj.images || [obj.imageUrl];
     obj.countInStock = obj.countInStock ?? obj.stock ?? 0;
     obj.stock = obj.stock ?? obj.countInStock ?? 0;

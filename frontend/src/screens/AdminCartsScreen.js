@@ -17,16 +17,14 @@ const showAlert = (title, message) => {
 
 const firstImage = (images) => {
   if (!Array.isArray(images) || images.length === 0) return '';
-  const image = images[0];
-  return image?.url || image?.src || image?.imageUrl || image?.image || image;
+  return images.map((image) => {
+    if (typeof image === 'string') return image;
+    return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
+  }).find(Boolean) || '';
 };
 
 const getProductImage = (product) => (
-  product?.imageUrl ||
-  product?.imageURL ||
-  product?.image ||
-  product?.thumbnail ||
-  firstImage(product?.images) ||
+  firstImage([product?.imageUrl, product?.imageURL, product?.image, product?.thumbnail, ...(product?.images || [])]) ||
   'https://via.placeholder.com/120x140?text=LUSH'
 );
 

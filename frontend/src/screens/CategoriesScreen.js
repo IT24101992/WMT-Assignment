@@ -142,10 +142,18 @@ export default function CategoriesScreen({ navigation }) {
     item.image || item.imageUrl || CATEGORY_FALLBACKS[index % CATEGORY_FALLBACKS.length]
   );
 
-  const getProductImage = (item) => {
-    if (Array.isArray(item.images) && item.images.length > 0) return item.images[0];
-    return item.imageUrl || item.image || 'https://via.placeholder.com/500x650?text=LUSH';
+  const firstImage = (images) => {
+    if (!Array.isArray(images) || images.length === 0) return '';
+    return images.map((image) => {
+      if (typeof image === 'string') return image;
+      return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
+    }).find(Boolean) || '';
   };
+
+  const getProductImage = (item) => (
+    firstImage([item?.imageUrl, item?.imageURL, item?.image, item?.thumbnail, ...(item?.images || [])]) ||
+    'https://via.placeholder.com/500x650?text=LUSH'
+  );
 
   const filteredProducts = selected
     ? products.filter((p) => getCategoryName(p.category).toLowerCase() === selected.toLowerCase())
