@@ -174,7 +174,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                         <Text style={styles.categoryTagText}>🏷️ {product.category}</Text>
                     </View>
 
-                    {/* NAME & PRICE */}
+                    {/* NAME AND PRICE */}
                     <Text style={styles.name}>{product.name}</Text>
                     <View style={styles.priceRow}>
                         <Text style={styles.price}>LKR {Number(product.price).toLocaleString()}</Text>
@@ -226,7 +226,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                         </View>
                     )}
 
-                    {/* ADMIN CONTROLS */}
+                    {/* ADMIN CONTROLS FOR EDIT AND DELETE */}
                     {isAdmin && (
                         <View style={styles.adminBox}>
                             <TouchableOpacity
@@ -245,7 +245,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                         </View>
                     )}
 
-                    {/* USER CONTROLS */}
+                    {/* USER CONTROLS FOR ADD TO CART*/}
                     {!isAdmin && (
                         <TouchableOpacity
                             style={[styles.cartBtn, addingToCart && { opacity: 0.65 }]}
