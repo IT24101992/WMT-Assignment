@@ -89,7 +89,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// @desc    Fetch single product
+// @desc    Fetch a single product
 // @route   GET /api/products/:id
 // @access  Public
 router.get('/:id', async (req, res) => {
@@ -106,7 +106,7 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// @desc    Create a product
+// @desc    Create Product
 // @route   POST /api/products
 // @access  Private/Admin
 router.post('/', protect, admin, async (req, res) => {
@@ -137,7 +137,7 @@ router.post('/', protect, admin, async (req, res) => {
     }
 });
 
-// @desc    Update a product
+// @desc    Update Product
 // @route   PUT /api/products/:id
 // @access  Private/Admin
 router.put('/:id', protect, admin, async (req, res) => {
@@ -182,7 +182,7 @@ router.put('/:id', protect, admin, async (req, res) => {
     }
 });
 
-// @desc    Update only product category
+// @desc    Update Product category
 // @route   PATCH /api/products/:id/category
 // @access  Private/Admin
 router.patch('/:id/category', protect, admin, async (req, res) => {
