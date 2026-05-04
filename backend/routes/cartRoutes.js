@@ -226,6 +226,37 @@ router.delete('/remove/:itemId', protect, async (req, res) => {
     }
 });
 
+// @desc    Remove selected items from cart
+// @route   POST /api/cart/remove-selected
+// @access  Private
+router.post('/remove-selected', protect, async (req, res) => {
+    try {
+        const itemIds = Array.isArray(req.body.itemIds)
+            ? req.body.itemIds.map((id) => id?.toString()).filter(Boolean)
+            : [];
+
+        if (itemIds.length === 0) {
+            return res.status(400).json({ message: 'No cart items selected' });
+        }
+
+        let cart = await Cart.findOne({ user: req.user._id }).populate('items.product');
+
+        if (!cart) {
+            return res.status(404).json({ message: 'Cart not found' });
+        }
+
+        const idsToRemove = new Set(itemIds);
+        cart.items = cart.items.filter((item) => !idsToRemove.has(item._id.toString()));
+        cart.totalPrice = await recalculateTotalFromProducts(cart.items);
+        await cart.save();
+
+        cart = await populateCart(cart._id);
+        res.json(await toResponseCart(cart));
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // @desc    Clear cart
 // @route   DELETE /api/cart/clear
 // @access  Private

@@ -31,12 +31,14 @@ export default function CartScreen({ navigation }) {
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updatingItemId, setUpdatingItemId] = useState(null);
+  const [selectedItemIds, setSelectedItemIds] = useState([]);
 
   const loadCart = async () => {
     try {
       setLoading(true);
       const data = await fetchCart();
       setCart(data);
+      setSelectedItemIds((data?.items || []).map((item) => item._id));
     } catch (e) {
       console.log(e);
     } finally {
@@ -55,6 +57,7 @@ export default function CartScreen({ navigation }) {
       setUpdatingItemId(itemId);
       const updated = await removeFromCart(itemId);
       setCart(updated);
+      setSelectedItemIds((current) => current.filter((id) => id !== itemId));
       refreshCart();
     } catch (_e) {
       showAlert('Error', 'Failed to remove item');
@@ -86,11 +89,30 @@ export default function CartScreen({ navigation }) {
       try {
         const updated = await clearCart();
         setCart(updated);
+        setSelectedItemIds([]);
         refreshCart();
       } catch (_e) {
         showAlert('Error', 'Failed to clear cart');
       }
     });
+  };
+
+  const toggleItemSelection = (itemId) => {
+    setSelectedItemIds((current) => (
+      current.includes(itemId)
+        ? current.filter((id) => id !== itemId)
+        : [...current, itemId]
+    ));
+  };
+
+  const toggleSelectAll = () => {
+    const items = cart?.items || [];
+    if (selectedItemIds.length === items.length) {
+      setSelectedItemIds([]);
+      return;
+    }
+
+    setSelectedItemIds(items.map((item) => item._id));
   };
 
   const renderItem = ({ item }) => {
@@ -99,9 +121,19 @@ export default function CartScreen({ navigation }) {
     const unitPrice = Number(product.price || 0);
     const lineTotal = unitPrice * quantity;
     const isUpdating = updatingItemId === item._id;
+    const isSelected = selectedItemIds.includes(item._id);
 
     return (
-      <View style={styles.cartItem}>
+      <View style={[styles.cartItem, isSelected && styles.cartItemSelected]}>
+        <TouchableOpacity
+          style={[styles.selectBox, isSelected && styles.selectBoxActive]}
+          onPress={() => toggleItemSelection(item._id)}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.selectBoxText, isSelected && styles.selectBoxTextActive]}>
+            {isSelected ? '✓' : ''}
+          </Text>
+        </TouchableOpacity>
         <Image
           source={{ uri: product.imageUrl || product.images?.[0]?.url || product.images?.[0] || 'https://via.placeholder.com/120x120?text=Item' }}
           style={styles.itemImage}
@@ -145,7 +177,26 @@ export default function CartScreen({ navigation }) {
   if (loading) return <ActivityIndicator size="large" color="#1B1B1B" style={styles.loader} />;
 
   const items = cart?.items || [];
-  const quantityTotal = items.reduce((total, item) => total + Number(item.quantity || 0), 0);
+  const selectedItems = items.filter((item) => selectedItemIds.includes(item._id));
+  const quantityTotal = selectedItems.reduce((total, item) => total + Number(item.quantity || 0), 0);
+  const selectedTotal = selectedItems.reduce((total, item) => {
+    const price = Number(item.product?.price || 0);
+    const quantity = Number(item.quantity || 0);
+    return total + price * quantity;
+  }, 0);
+  const allSelected = items.length > 0 && selectedItemIds.length === items.length;
+
+  const handleCheckout = () => {
+    if (selectedItems.length === 0) {
+      showAlert('Select Items', 'Please select at least one item to checkout');
+      return;
+    }
+
+    navigation.navigate('Checkout', {
+      cart: { ...cart, items: selectedItems, totalPrice: selectedTotal },
+      selectedItemIds,
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -171,6 +222,12 @@ export default function CartScreen({ navigation }) {
         </View>
       ) : (
         <>
+          <View style={styles.selectionBar}>
+            <TouchableOpacity onPress={toggleSelectAll} style={styles.selectAllBtn}>
+              <Text style={styles.selectAllText}>{allSelected ? 'Unselect All' : 'Select All'}</Text>
+            </TouchableOpacity>
+            <Text style={styles.selectedCount}>{selectedItems.length} of {items.length} selected</Text>
+          </View>
           <FlatList
             data={items}
             keyExtractor={(item) => item._id}
@@ -179,12 +236,12 @@ export default function CartScreen({ navigation }) {
           />
           <View style={styles.footer}>
             <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total ({quantityTotal} items)</Text>
-              <Text style={styles.totalValue}>LKR {Number(cart?.totalPrice || 0).toLocaleString()}</Text>
+              <Text style={styles.totalLabel}>Selected ({quantityTotal} items)</Text>
+              <Text style={styles.totalValue}>LKR {selectedTotal.toLocaleString()}</Text>
             </View>
             <TouchableOpacity
-              style={styles.checkoutBtn}
-              onPress={() => navigation.navigate('Checkout', { cart })}
+              style={[styles.checkoutBtn, selectedItems.length === 0 && styles.disabledBtn]}
+              onPress={handleCheckout}
             >
               <Text style={styles.checkoutBtnText}>Proceed to Checkout</Text>
             </TouchableOpacity>
@@ -206,11 +263,30 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#1B1B1B', fontSize: 24, fontFamily: 'Georgia', fontWeight: '700' },
   clearBtn: { color: '#9F8247', fontWeight: '700', fontSize: 14 },
   list: { padding: 14, paddingBottom: 20 },
+  selectionBar: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4,
+  },
+  selectAllBtn: {
+    backgroundColor: '#FFFFFF', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: '#E9E2D8',
+  },
+  selectAllText: { color: '#9F8247', fontWeight: '800', fontSize: 13 },
+  selectedCount: { color: '#8A8175', fontWeight: '700', fontSize: 12 },
   cartItem: {
     flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 16,
-    padding: 12, marginBottom: 12,
+    padding: 12, marginBottom: 12, borderWidth: 1, borderColor: 'transparent',
     shadowColor: '#1B1B1B', shadowOpacity: 0.06, shadowRadius: 14, elevation: 3,
   },
+  cartItemSelected: { borderColor: '#BFA46A', backgroundColor: '#FFFCF4' },
+  selectBox: {
+    width: 24, height: 24, borderRadius: 8, borderWidth: 1,
+    borderColor: '#D8CCB6', alignItems: 'center', justifyContent: 'center',
+    marginRight: 10, alignSelf: 'center', backgroundColor: '#FFFFFF',
+  },
+  selectBoxActive: { backgroundColor: '#BFA46A', borderColor: '#BFA46A' },
+  selectBoxText: { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
+  selectBoxTextActive: { color: '#FFFFFF' },
   itemImage: { width: 88, height: 108, borderRadius: 12, backgroundColor: '#F7F3EC' },
   itemInfo: { flex: 1, marginLeft: 12 },
   itemName: { fontSize: 14, fontWeight: '700', color: '#1B1B1B', marginBottom: 4 },

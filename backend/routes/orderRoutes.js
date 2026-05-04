@@ -20,6 +20,15 @@ const firstImage = (images) => {
   return image?.url || image?.src || image;
 };
 
+const ORDER_STATUSES = ['Pending', 'Order Placed', 'Order Cancelled'];
+
+const hasShippingAddress = (shippingAddress) => (
+  shippingAddress?.fullName?.trim()
+  && shippingAddress?.address?.trim()
+  && shippingAddress?.city?.trim()
+  && shippingAddress?.phoneNumber?.trim()
+);
+
 // @route   POST /api/orders
 // @desc    Create new order
 // @access  Private
@@ -96,8 +105,45 @@ router.get('/myorders', protect, async (req, res) => {
 // @access  Private/Admin
 router.get('/', protect, admin, async (req, res) => {
   try {
-    const orders = await Order.find({}).populate('user', 'id name');
+    const orders = await Order.find({})
+      .populate('user', 'id name email')
+      .sort({ createdAt: -1 });
     res.json(orders);
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// @route   PUT /api/orders/:id/shipping
+// @desc    Update shipping details for the logged in user's order
+// @access  Private
+router.put('/:id/shipping', protect, async (req, res) => {
+  try {
+    const { shippingAddress } = req.body;
+
+    if (!hasShippingAddress(shippingAddress)) {
+      return res.status(400).json({ message: 'Please provide complete shipping details' });
+    }
+
+    const order = await Order.findOne({ _id: req.params.id, user: req.user._id });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (order.status === 'Order Cancelled') {
+      return res.status(400).json({ message: 'Cancelled orders cannot be updated' });
+    }
+
+    order.shippingAddress = {
+      fullName: shippingAddress.fullName.trim(),
+      address: shippingAddress.address.trim(),
+      city: shippingAddress.city.trim(),
+      phoneNumber: shippingAddress.phoneNumber.trim(),
+    };
+
+    const updatedOrder = await order.save();
+    res.json(updatedOrder);
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
   }
@@ -108,9 +154,13 @@ router.get('/', protect, admin, async (req, res) => {
 // @access  Private/Admin
 router.put('/:id/status', protect, admin, async (req, res) => {
   try {
+    if (!ORDER_STATUSES.includes(req.body.status)) {
+      return res.status(400).json({ message: 'Invalid order status' });
+    }
+
     const order = await Order.findById(req.params.id);
     if (order) {
-      order.status = req.body.status || order.status;
+      order.status = req.body.status;
       const updatedOrder = await order.save();
       res.json(updatedOrder);
     } else {

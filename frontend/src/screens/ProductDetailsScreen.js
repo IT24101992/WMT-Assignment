@@ -46,6 +46,10 @@ const isNewArrival = (product) => {
     return Number.isFinite(createdTime) && createdTime >= oneDayAgo;
 };
 
+const getProductImage = (product) => (
+    product?.imageUrl || product?.images?.[0]?.url || product?.images?.[0] || 'https://via.placeholder.com/300'
+);
+
 export default function ProductDetailsScreen({ route, navigation }) {
     const { width } = useWindowDimensions();
     const { productId } = route.params;
@@ -140,7 +144,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
 
                 {/* IMAGE */}
                 <Image
-                    source={{ uri: product.imageUrl || product.images?.[0]?.url || product.images?.[0] || 'https://via.placeholder.com/300' }}
+                    source={{ uri: getProductImage(product) }}
                     style={[styles.image, { height: width >= 900 ? 460 : 360 }]}
                     resizeMode="contain"
                 />
@@ -277,6 +281,19 @@ export default function ProductDetailsScreen({ route, navigation }) {
             <Modal transparent visible={showCartModal} animationType="fade" onRequestClose={() => setShowCartModal(false)}>
                 <View style={styles.overlay}>
                     <View style={styles.modal}>
+                        <View style={styles.cartModalHero}>
+                            <Image
+                                source={{ uri: getProductImage(product) }}
+                                style={styles.cartModalImage}
+                                resizeMode="cover"
+                            />
+                            <View style={styles.cartModalInfo}>
+                                <Text style={styles.modalEyebrow}>Added to Bag</Text>
+                                <Text style={styles.modalMeta}>
+                                    {selectedSize ? `Size ${selectedSize} - ` : ''}Qty {quantity}
+                                </Text>
+                            </View>
+                        </View>
                         <Text style={styles.modalTitle}>✅ Added to Cart!</Text>
                         <Text style={styles.modalMessage}>
                             {product?.name} ({selectedSize} × {quantity}) has been added to your cart.
@@ -380,6 +397,14 @@ const styles = StyleSheet.create({
         width: '100%', maxWidth: 400,
         shadowColor: '#1B1B1B', shadowOpacity: 0.2, shadowRadius: 20, elevation: 10,
     },
+    cartModalHero: { flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: 16 },
+    cartModalImage: { width: 88, height: 112, borderRadius: 14, backgroundColor: '#F7F3EC' },
+    cartModalInfo: { flex: 1 },
+    modalEyebrow: {
+        color: '#9F8247', fontSize: 10, fontWeight: '900',
+        letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6,
+    },
+    modalMeta: { fontSize: 13, color: '#8A8175', fontWeight: '700' },
     modalTitle: { fontSize: 22, fontFamily: 'Georgia', fontWeight: '700', color: '#1B1B1B', marginBottom: 10 },
     modalMessage: { fontSize: 14, color: '#3B3B3B', lineHeight: 22, marginBottom: 24 },
     modalBtnRow: { flexDirection: 'row', gap: 12 },

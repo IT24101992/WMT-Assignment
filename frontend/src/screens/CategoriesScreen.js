@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Image,
+  ActivityIndicator, Image, useWindowDimensions, Modal, TextInput, Alert, Platform,
 } from 'react-native';
-import { fetchCategories, fetchProducts } from '../services/api';
+import {
+  createCategory, deleteCategory, fetchCategories, fetchProducts, updateCategory,
+} from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const CATEGORY_FALLBACKS = [
   'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=900',
@@ -13,11 +16,47 @@ const CATEGORY_FALLBACKS = [
   'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=900',
 ];
 
+const emptyCategoryForm = {
+  name: '',
+  description: '',
+  image: '',
+};
+
+const showAlert = (title, message) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
+const showConfirm = (title, message, onConfirm) => {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n${message}`)) onConfirm();
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'OK', onPress: onConfirm },
+  ]);
+};
+
 export default function CategoriesScreen({ navigation }) {
+  const { user } = useAuth();
+  const isAdmin = user?.isAdmin === true;
+  const { width } = useWindowDimensions();
+  const productColumns = width >= 900 ? 3 : 2;
+  const productCardWidth = productColumns === 3 ? '32%' : '48%';
+  const productImageHeight = productColumns === 3 ? 260 : 210;
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [categoryForm, setCategoryForm] = useState(emptyCategoryForm);
+  const [savingCategory, setSavingCategory] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -33,6 +72,64 @@ export default function CategoriesScreen({ navigation }) {
     };
     load();
   }, []);
+
+  const openCategoryModal = (category = null) => {
+    setEditingCategory(category);
+    setCategoryForm(category ? {
+      name: category.name || '',
+      description: category.description || '',
+      image: category.image || '',
+    } : emptyCategoryForm);
+    setCategoryModalVisible(true);
+  };
+
+  const closeCategoryModal = () => {
+    setCategoryModalVisible(false);
+    setEditingCategory(null);
+    setCategoryForm(emptyCategoryForm);
+  };
+
+  const saveCategory = async () => {
+    if (!categoryForm.name.trim()) {
+      showAlert('Missing Name', 'Please enter a category name');
+      return;
+    }
+
+    try {
+      setSavingCategory(true);
+      const payload = {
+        name: categoryForm.name.trim(),
+        description: categoryForm.description.trim(),
+        image: categoryForm.image.trim(),
+      };
+      const saved = editingCategory
+        ? await updateCategory(editingCategory._id, payload)
+        : await createCategory(payload);
+
+      setCategories((current) => (
+        editingCategory
+          ? current.map((category) => (category._id === saved._id ? saved : category))
+          : [...current, saved]
+      ));
+      closeCategoryModal();
+    } catch (e) {
+      showAlert('Category Error', e.message || 'Could not save category');
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const removeCategory = (category) => {
+    showConfirm('Delete Category', `Delete "${category.name}"?`, async () => {
+      try {
+        await deleteCategory(category._id);
+        setCategories((current) => current.filter((item) => item._id !== category._id));
+        if (selected === category.name) setSelected(null);
+      } catch (e) {
+        showAlert('Delete Failed', e.message || 'Could not delete category');
+      }
+    });
+  };
 
   const getCategoryName = (category) => {
     if (!category) return '';
@@ -72,6 +169,16 @@ export default function CategoriesScreen({ navigation }) {
         <View style={styles.catMeta}>
           <Text style={styles.catName}>{item.name}</Text>
           <Text style={styles.catCount}>{itemCount} pieces</Text>
+          {isAdmin ? (
+            <View style={styles.catActions}>
+              <TouchableOpacity style={styles.catActionBtn} onPress={() => openCategoryModal(item)}>
+                <Text style={styles.catActionText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.catDeleteBtn} onPress={() => removeCategory(item)}>
+                <Text style={styles.catDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </View>
       </TouchableOpacity>
     );
@@ -79,13 +186,13 @@ export default function CategoriesScreen({ navigation }) {
 
   const renderProduct = ({ item }) => (
     <TouchableOpacity
-      style={styles.productCard}
+      style={[styles.productCard, { width: productCardWidth }]}
       onPress={() => navigation.navigate('ProductDetails', { productId: item._id })}
       activeOpacity={0.85}
     >
       <Image
         source={{ uri: getProductImage(item) }}
-        style={styles.productImage}
+        style={[styles.productImage, { height: productImageHeight }]}
         resizeMode="cover"
       />
       <View style={styles.productInfo}>
@@ -99,6 +206,11 @@ export default function CategoriesScreen({ navigation }) {
     <View style={styles.listHeader}>
       <Text style={styles.kicker}>LUSH COLLECTIONS</Text>
       <Text style={styles.categoryTitle}>Shop by Category</Text>
+      {isAdmin ? (
+        <TouchableOpacity style={styles.addCategoryBtn} onPress={() => openCategoryModal()}>
+          <Text style={styles.addCategoryText}>Add Category</Text>
+        </TouchableOpacity>
+      ) : null}
       <FlatList
         data={categories}
         keyExtractor={(item) => item._id}
@@ -133,9 +245,10 @@ export default function CategoriesScreen({ navigation }) {
 
       <FlatList
         data={filteredProducts}
+        key={`category-products-${productColumns}`}
         keyExtractor={(item) => item._id}
         renderItem={renderProduct}
-        numColumns={2}
+        numColumns={productColumns}
         columnWrapperStyle={styles.productRow}
         contentContainerStyle={styles.productList}
         ListHeaderComponent={renderListHeader}
@@ -143,6 +256,52 @@ export default function CategoriesScreen({ navigation }) {
           <Text style={styles.empty}>No products in this category.</Text>
         }
       />
+
+      <Modal
+        transparent
+        visible={categoryModalVisible}
+        animationType="fade"
+        onRequestClose={closeCategoryModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{editingCategory ? 'Edit Category' : 'Add Category'}</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Category name"
+              placeholderTextColor="#8A8175"
+              value={categoryForm.name}
+              onChangeText={(text) => setCategoryForm((form) => ({ ...form, name: text }))}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Description"
+              placeholderTextColor="#8A8175"
+              value={categoryForm.description}
+              onChangeText={(text) => setCategoryForm((form) => ({ ...form, description: text }))}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Image URL"
+              placeholderTextColor="#8A8175"
+              value={categoryForm.image}
+              onChangeText={(text) => setCategoryForm((form) => ({ ...form, image: text }))}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={closeCategoryModal}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, savingCategory && styles.disabledBtn]}
+                onPress={saveCategory}
+                disabled={savingCategory}
+              >
+                <Text style={styles.modalSaveText}>{savingCategory ? 'Saving...' : 'Save'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -168,6 +327,11 @@ const styles = StyleSheet.create({
     color: '#1B1B1B', fontSize: 24, fontWeight: '800',
     textAlign: 'center', marginBottom: 22,
   },
+  addCategoryBtn: {
+    alignSelf: 'center', backgroundColor: '#BFA46A', borderRadius: 12,
+    paddingVertical: 11, paddingHorizontal: 22, marginBottom: 18,
+  },
+  addCategoryText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
   categoryRail: { gap: 14, paddingHorizontal: 2, paddingBottom: 22 },
   catCard: {
     width: 188, backgroundColor: '#FFFFFF', borderRadius: 16,
@@ -179,6 +343,17 @@ const styles = StyleSheet.create({
   catMeta: { padding: 12, alignItems: 'center' },
   catName: { fontSize: 15, fontWeight: '800', color: '#1B1B1B', textAlign: 'center' },
   catCount: { fontSize: 11, color: '#8A8175', marginTop: 4, fontWeight: '700' },
+  catActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  catActionBtn: {
+    borderRadius: 10, paddingVertical: 7, paddingHorizontal: 10,
+    backgroundColor: '#F5F1EA',
+  },
+  catActionText: { color: '#9F8247', fontWeight: '800', fontSize: 11 },
+  catDeleteBtn: {
+    borderRadius: 10, paddingVertical: 7, paddingHorizontal: 10,
+    borderWidth: 1, borderColor: '#B63B3B',
+  },
+  catDeleteText: { color: '#B63B3B', fontWeight: '800', fontSize: 11 },
   productsHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
     marginBottom: 14, paddingHorizontal: 2,
@@ -198,4 +373,32 @@ const styles = StyleSheet.create({
   productName: { fontSize: 13, fontWeight: '700', color: '#1B1B1B' },
   productPrice: { fontSize: 13, fontWeight: '800', color: '#BFA46A', marginTop: 4 },
   empty: { textAlign: 'center', color: '#8A8175', marginTop: 30, fontSize: 15 },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center', alignItems: 'center', padding: 24,
+  },
+  modalCard: {
+    width: '100%', maxWidth: 420, backgroundColor: '#FFFFFF',
+    borderRadius: 16, padding: 20,
+  },
+  modalTitle: {
+    color: '#1B1B1B', fontFamily: 'Georgia', fontSize: 22,
+    fontWeight: '700', marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: '#FBFAF7', borderWidth: 1, borderColor: '#E9E2D8',
+    borderRadius: 12, padding: 13, color: '#1B1B1B', marginBottom: 10,
+  },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  modalCancelBtn: {
+    flex: 1, borderRadius: 12, padding: 14, alignItems: 'center',
+    borderWidth: 1, borderColor: '#E9E2D8',
+  },
+  modalCancelText: { color: '#3B3B3B', fontWeight: '800' },
+  modalSaveBtn: {
+    flex: 1, borderRadius: 12, padding: 14, alignItems: 'center',
+    backgroundColor: '#BFA46A',
+  },
+  modalSaveText: { color: '#FFFFFF', fontWeight: '800' },
+  disabledBtn: { opacity: 0.45 },
 });
