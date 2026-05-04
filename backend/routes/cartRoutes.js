@@ -239,19 +239,23 @@ router.post('/remove-selected', protect, async (req, res) => {
             return res.status(400).json({ message: 'No cart items selected' });
         }
 
-        let cart = await Cart.findOne({ user: req.user._id }).populate('items.product');
+        const cart = await Cart.findOne({ user: req.user._id }).lean();
 
         if (!cart) {
             return res.status(404).json({ message: 'Cart not found' });
         }
 
         const idsToRemove = new Set(itemIds);
-        cart.items = cart.items.filter((item) => !idsToRemove.has(item._id.toString()));
-        cart.totalPrice = await recalculateTotalFromProducts(cart.items);
-        await cart.save();
+        const remainingItems = cart.items.filter((item) => !idsToRemove.has(item._id.toString()));
+        const totalPrice = await recalculateTotalFromProducts(remainingItems);
 
-        cart = await populateCart(cart._id);
-        res.json(await toResponseCart(cart));
+        await Cart.updateOne(
+            { _id: cart._id },
+            { $set: { items: remainingItems, totalPrice } }
+        );
+
+        const updatedCart = await populateCart(cart._id);
+        res.json(await toResponseCart(updatedCart));
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
-import { createOrder } from '../services/api';
+import { createOrder, removeSelectedFromCart } from '../services/api';
 import { useCart } from '../context/CartContext';
 
 const showAlert = (title, message) => {
@@ -59,6 +59,16 @@ export default function CheckoutScreen({ route, navigation }) {
       const result = await createOrder(orderData);
 
       if (result._id) {
+        const itemIdsToRemove = orderData.cartItemIds || [];
+
+        try {
+          if (itemIdsToRemove.length > 0) {
+            await removeSelectedFromCart(itemIdsToRemove);
+          }
+        } catch (cleanupError) {
+          console.log('Cart cleanup fallback failed after order placement', cleanupError);
+        }
+
         await refreshCart();
         showAlert('Order Placed!', `Order ID: ${result._id.slice(-8).toUpperCase()}`);
         navigation.navigate('OrderHistory');
