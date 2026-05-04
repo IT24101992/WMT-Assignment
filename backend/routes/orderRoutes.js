@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Order = require('../models/Order');
 const Product = require('../models/Product');
@@ -29,6 +30,11 @@ const hasShippingAddress = (shippingAddress) => (
   && shippingAddress?.city?.trim()
   && shippingAddress?.phoneNumber?.trim()
 );
+
+const toObjectIds = (ids = []) => ids
+  .map((id) => id?.toString())
+  .filter((id) => mongoose.Types.ObjectId.isValid(id))
+  .map((id) => new mongoose.Types.ObjectId(id));
 
 const updateShippingDetails = async (req, res) => {
   try {
@@ -90,29 +96,27 @@ const recalculateCartTotal = async (items) => {
 };
 
 const removeOrderedItemsFromCart = async ({ userId, cartItemIds = [], orderItems = [] }) => {
-  const idsToRemove = (Array.isArray(cartItemIds) ? cartItemIds : [])
-    .map((id) => id?.toString())
-    .filter(Boolean);
+  const idsToRemove = toObjectIds(Array.isArray(cartItemIds) ? cartItemIds : []);
 
   if (idsToRemove.length > 0) {
     await Cart.updateOne(
       { user: userId },
       { $pull: { items: { _id: { $in: idsToRemove } } } }
     );
-  }
-
-  for (const item of orderItems) {
-    await Cart.updateOne(
-      { user: userId },
-      {
-        $pull: {
-          items: {
-            product: item.product,
-            size: item.size || '',
+  } else {
+    for (const item of orderItems) {
+      await Cart.updateOne(
+        { user: userId },
+        {
+          $pull: {
+            items: {
+              product: item.product,
+              size: item.size || '',
+            },
           },
-        },
-      }
-    );
+        }
+      );
+    }
   }
 
   const cart = await Cart.findOne({ user: userId }).lean();

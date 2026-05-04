@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
@@ -7,6 +8,11 @@ const { protect } = require('../middleware/auth');
 const router = express.Router();
 
 const populateCart = (cartId) => Cart.findById(cartId).populate('items.product');
+
+const toObjectIds = (ids = []) => ids
+    .map((id) => id?.toString())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
 
 const getProductId = (item) => {
     const product = item.product;
@@ -231,9 +237,7 @@ router.delete('/remove/:itemId', protect, async (req, res) => {
 // @access  Private
 router.post('/remove-selected', protect, async (req, res) => {
     try {
-        const itemIds = Array.isArray(req.body.itemIds)
-            ? req.body.itemIds.map((id) => id?.toString()).filter(Boolean)
-            : [];
+        const itemIds = toObjectIds(Array.isArray(req.body.itemIds) ? req.body.itemIds : []);
 
         if (itemIds.length === 0) {
             return res.status(400).json({ message: 'No cart items selected' });

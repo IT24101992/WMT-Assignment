@@ -48,12 +48,12 @@ export default function CheckoutScreen({ route, navigation }) {
         return;
       }
 
+      const checkoutItemIds = (cart?.items || []).map((item) => item._id).filter(Boolean);
+
       const orderData = {
         orderItems,
         shippingAddress: { fullName, address, city, phoneNumber },
-        cartItemIds: selectedItemIds.length
-          ? selectedItemIds
-          : (cart?.items || []).map((item) => item._id).filter(Boolean),
+        cartItemIds: checkoutItemIds.length ? checkoutItemIds : selectedItemIds,
       };
 
       const result = await createOrder(orderData);
