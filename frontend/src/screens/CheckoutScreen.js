@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
-import { createOrder, removeSelectedFromCart } from '../services/api';
+import { createOrder } from '../services/api';
 import { useCart } from '../context/CartContext';
 
 const showAlert = (title, message) => {
@@ -40,6 +40,7 @@ export default function CheckoutScreen({ route, navigation }) {
       const orderItems = (cart?.items || []).map((item) => ({
         qty: Number(item.quantity || 0),
         product: item.product?._id,
+        size: item.size || '',
       })).filter((item) => item.product && item.qty > 0);
 
       if (orderItems.length === 0) {
@@ -50,24 +51,15 @@ export default function CheckoutScreen({ route, navigation }) {
       const orderData = {
         orderItems,
         shippingAddress: { fullName, address, city, phoneNumber },
+        cartItemIds: selectedItemIds.length
+          ? selectedItemIds
+          : (cart?.items || []).map((item) => item._id).filter(Boolean),
       };
 
       const result = await createOrder(orderData);
 
       if (result._id) {
-        const itemIdsToRemove = selectedItemIds.length
-          ? selectedItemIds
-          : (cart?.items || []).map((item) => item._id).filter(Boolean);
-
-        try {
-          if (itemIdsToRemove.length > 0) {
-            await removeSelectedFromCart(itemIdsToRemove);
-          }
-        } catch (cleanupError) {
-          console.log('Cart cleanup failed after order placement', cleanupError);
-        }
-
-        refreshCart();
+        await refreshCart();
         showAlert('Order Placed!', `Order ID: ${result._id.slice(-8).toUpperCase()}`);
         navigation.navigate('OrderHistory');
       } else {

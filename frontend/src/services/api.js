@@ -32,19 +32,22 @@ const authHeaders = async () => {
 };
 
 const handleResponse = async (res) => {
-    let data;
+    const text = await res.text();
+    let data = null;
 
-    try {
-        data = await res.json();
-    } catch (_e) {
-        throw new Error('Invalid server response');
+    if (text) {
+        try {
+            data = JSON.parse(text);
+        } catch (_e) {
+            throw new Error(`Server returned ${res.status}. Please restart the backend and try again.`);
+        }
     }
 
     if (!res.ok) {
-        throw new Error(data?.message || 'Something went wrong');
+        throw new Error(data?.message || `Request failed (${res.status})`);
     }
 
-    return data;
+    return data || {};
 };
 
 export const registerUser = async (name, email, password) => {

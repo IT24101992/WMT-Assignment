@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const Cart = require('../models/Cart');
 const { protect, admin } = require('../middleware/auth');
 
 const toValidQuantity = (quantity) => {
@@ -29,12 +30,67 @@ const hasShippingAddress = (shippingAddress) => (
   && shippingAddress?.phoneNumber?.trim()
 );
 
+const getCartProductId = (item) => {
+  const product = item.product;
+  return (product?._id || product)?.toString();
+};
+
+const recalculateCartTotal = async (items) => {
+  const productIds = items.map(getCartProductId).filter(Boolean);
+  const products = await Product.find({ _id: { $in: productIds } }).select('price');
+  const priceByProductId = new Map(
+    products.map((product) => [product._id.toString(), Number(product.price)])
+  );
+
+  return items.reduce((total, item) => {
+    const price = priceByProductId.get(getCartProductId(item));
+    const quantity = Number(item.quantity);
+
+    if (!Number.isFinite(price) || !Number.isFinite(quantity)) {
+      return total;
+    }
+
+    return total + price * quantity;
+  }, 0);
+};
+
+const cartItemKey = (productId, size = '') => `${productId || ''}::${size || ''}`;
+
+const removeOrderedItemsFromCart = async ({ userId, cartItemIds = [], orderItems = [] }) => {
+  const cart = await Cart.findOne({ user: userId }).lean();
+
+  if (!cart) return;
+
+  const idsToRemove = new Set(
+    (Array.isArray(cartItemIds) ? cartItemIds : [])
+      .map((id) => id?.toString())
+      .filter(Boolean)
+  );
+  const orderedKeys = new Set(
+    orderItems.map((item) => cartItemKey(item.product?.toString(), item.size))
+  );
+
+  const remainingItems = cart.items.filter((item) => {
+    const itemId = item._id.toString();
+    const productId = getCartProductId(item);
+    const key = cartItemKey(productId, item.size);
+    return !idsToRemove.has(itemId) && !orderedKeys.has(key);
+  });
+
+  const totalPrice = await recalculateCartTotal(remainingItems);
+
+  await Cart.updateOne(
+    { _id: cart._id },
+    { $set: { items: remainingItems, totalPrice } }
+  );
+};
+
 // @route   POST /api/orders
 // @desc    Create new order
 // @access  Private
 router.post('/', protect, async (req, res) => {
   try {
-    const { orderItems, shippingAddress } = req.body;
+    const { orderItems, shippingAddress, cartItemIds } = req.body;
 
     if (!Array.isArray(orderItems) || orderItems.length === 0) {
       return res.status(400).json({ message: 'No order items' });
@@ -63,6 +119,7 @@ router.post('/', protect, async (req, res) => {
         qty: quantity,
         image: product.imageUrl || firstImage(product.images),
         price,
+        size: item.size || '',
         product: product._id,
       });
     }
@@ -80,6 +137,17 @@ router.post('/', protect, async (req, res) => {
     });
 
     const createdOrder = await order.save();
+
+    try {
+      await removeOrderedItemsFromCart({
+        userId: req.user._id,
+        cartItemIds,
+        orderItems: cleanedOrderItems,
+      });
+    } catch (cleanupErr) {
+      console.error('Cart cleanup failed after order placement', cleanupErr);
+    }
+
     res.status(201).json(createdOrder);
   } catch (err) {
     console.error(err);
