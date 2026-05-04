@@ -30,6 +30,41 @@ const hasShippingAddress = (shippingAddress) => (
   && shippingAddress?.phoneNumber?.trim()
 );
 
+const updateShippingDetails = async (req, res) => {
+  try {
+    const { shippingAddress } = req.body;
+
+    if (!hasShippingAddress(shippingAddress)) {
+      return res.status(400).json({ message: 'Please provide complete shipping details' });
+    }
+
+    const order = await Order.findOne({ _id: req.params.id, user: req.user._id });
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found for this logged-in user. Please refresh orders and try again.',
+      });
+    }
+
+    if (order.status === 'Order Cancelled') {
+      return res.status(400).json({ message: 'Cancelled orders cannot be updated' });
+    }
+
+    order.shippingAddress = {
+      fullName: shippingAddress.fullName.trim(),
+      address: shippingAddress.address.trim(),
+      city: shippingAddress.city.trim(),
+      phoneNumber: shippingAddress.phoneNumber.trim(),
+    };
+
+    const updatedOrder = await order.save();
+    res.json(updatedOrder);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
 const getCartProductId = (item) => {
   const product = item.product;
   return (product?._id || product)?.toString();
@@ -190,37 +225,12 @@ router.get('/', protect, admin, async (req, res) => {
 // @route   PUT /api/orders/:id/shipping
 // @desc    Update shipping details for the logged in user's order
 // @access  Private
-router.put('/:id/shipping', protect, async (req, res) => {
-  try {
-    const { shippingAddress } = req.body;
+router.put('/:id/shipping', protect, updateShippingDetails);
 
-    if (!hasShippingAddress(shippingAddress)) {
-      return res.status(400).json({ message: 'Please provide complete shipping details' });
-    }
-
-    const order = await Order.findOne({ _id: req.params.id, user: req.user._id });
-
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
-
-    if (order.status === 'Order Cancelled') {
-      return res.status(400).json({ message: 'Cancelled orders cannot be updated' });
-    }
-
-    order.shippingAddress = {
-      fullName: shippingAddress.fullName.trim(),
-      address: shippingAddress.address.trim(),
-      city: shippingAddress.city.trim(),
-      phoneNumber: shippingAddress.phoneNumber.trim(),
-    };
-
-    const updatedOrder = await order.save();
-    res.json(updatedOrder);
-  } catch (err) {
-    res.status(500).json({ message: 'Server Error' });
-  }
-});
+// @route   PATCH /api/orders/:id/shipping
+// @desc    Update shipping details for the logged in user's order
+// @access  Private
+router.patch('/:id/shipping', protect, updateShippingDetails);
 
 // @route   PUT /api/orders/:id/status
 // @desc    Update order status

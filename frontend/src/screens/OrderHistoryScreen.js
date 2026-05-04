@@ -109,6 +109,11 @@ export default function OrderHistoryScreen({ navigation }) {
   };
 
   const saveShippingDetails = async () => {
+    if (!editingOrder?._id) {
+      showAlert('Update Failed', 'Order ID is missing. Please refresh orders and try again.');
+      return;
+    }
+
     if (!shippingForm.fullName.trim() || !shippingForm.address.trim()
       || !shippingForm.city.trim() || !shippingForm.phoneNumber.trim()) {
       showAlert('Missing Details', 'Please fill all shipping fields');
