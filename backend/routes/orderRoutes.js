@@ -27,6 +27,7 @@ const firstImage = (images) => {
 };
 
 const ORDER_STATUSES = ['Pending', 'Order Placed', 'Order Cancelled'];
+const PAYMENT_METHODS = ['cod', 'card'];
 
 const hasShippingAddress = (shippingAddress) => (
   shippingAddress?.fullName?.trim()
@@ -34,6 +35,25 @@ const hasShippingAddress = (shippingAddress) => (
   && shippingAddress?.city?.trim()
   && shippingAddress?.phoneNumber?.trim()
 );
+
+const normalizeShippingAddress = (shippingAddress) => ({
+  fullName: shippingAddress.fullName.trim(),
+  address: shippingAddress.address.trim(),
+  city: shippingAddress.city.trim(),
+  phoneNumber: shippingAddress.phoneNumber.trim(),
+});
+
+const calculateOrderTotals = (orderItems) => {
+  const itemsPrice = orderItems.reduce(
+    (total, item) => total + Number(item.price || 0) * Number(item.qty || 0),
+    0
+  );
+  const shippingPrice = itemsPrice > 0 ? 200 : 0;
+  const taxPrice = itemsPrice * 0.08;
+  const totalPrice = itemsPrice + shippingPrice + taxPrice;
+
+  return { itemsPrice, shippingPrice, taxPrice, totalPrice };
+};
 
 const toObjectIds = (ids = []) => ids
   .map((id) => id?.toString())
@@ -60,12 +80,7 @@ const updateShippingDetails = async (req, res) => {
       return res.status(400).json({ message: 'Cancelled orders cannot be updated' });
     }
 
-    order.shippingAddress = {
-      fullName: shippingAddress.fullName.trim(),
-      address: shippingAddress.address.trim(),
-      city: shippingAddress.city.trim(),
-      phoneNumber: shippingAddress.phoneNumber.trim(),
-    };
+    order.shippingAddress = normalizeShippingAddress(shippingAddress);
 
     const updatedOrder = await order.save();
     res.json(updatedOrder);
@@ -138,10 +153,18 @@ const removeOrderedItemsFromCart = async ({ userId, cartItemIds = [], orderItems
 // @access  Private
 router.post('/', protect, async (req, res) => {
   try {
-    const { orderItems, shippingAddress, cartItemIds } = req.body;
+    const { orderItems, shippingAddress, cartItemIds, paymentMethod = 'cod' } = req.body;
 
     if (!Array.isArray(orderItems) || orderItems.length === 0) {
       return res.status(400).json({ message: 'No order items' });
+    }
+
+    if (!hasShippingAddress(shippingAddress)) {
+      return res.status(400).json({ message: 'Please provide complete shipping details' });
+    }
+
+    if (!PAYMENT_METHODS.includes(paymentMethod)) {
+      return res.status(400).json({ message: 'Invalid payment method' });
     }
 
     const cleanedOrderItems = [];
@@ -165,22 +188,29 @@ router.post('/', protect, async (req, res) => {
       cleanedOrderItems.push({
         name: product.name,
         qty: quantity,
-        image: imageValue(product.imageUrl) || imageValue(product.imageURL) || imageValue(product.image) || firstImage(product.images),
+        image: (
+          imageValue(product.imageUrl) ||
+          imageValue(product.imageURL) ||
+          imageValue(product.image) ||
+          imageValue(product.thumbnail) ||
+          firstImage(product.images)
+        ),
         price,
         size: item.size || '',
         product: product._id,
       });
     }
 
-    const totalPrice = cleanedOrderItems.reduce(
-      (total, item) => total + item.price * item.qty,
-      0
-    );
+    const { itemsPrice, shippingPrice, taxPrice, totalPrice } = calculateOrderTotals(cleanedOrderItems);
 
     const order = new Order({
       user: req.user._id,
       orderItems: cleanedOrderItems,
-      shippingAddress,
+      shippingAddress: normalizeShippingAddress(shippingAddress),
+      paymentMethod,
+      itemsPrice,
+      shippingPrice,
+      taxPrice,
       totalPrice,
     });
 
@@ -208,7 +238,9 @@ router.post('/', protect, async (req, res) => {
 // @access  Private
 router.get('/myorders', protect, async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
+    const orders = await Order.find({ user: req.user._id })
+      .populate('orderItems.product')
+      .sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
     console.error(err);
@@ -223,6 +255,7 @@ router.get('/', protect, admin, async (req, res) => {
   try {
     const orders = await Order.find({})
       .populate('user', 'id name email')
+      .populate('orderItems.product')
       .sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {

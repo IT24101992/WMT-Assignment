@@ -43,9 +43,29 @@ const showConfirm = (title, message, onConfirm) => {
 };
 
 const getOrderImage = (order) => {
-  const firstItem = order.orderItems?.find((item) => item?.image);
-  return firstItem?.image || 'https://via.placeholder.com/300x360?text=LUSH';
+  const firstItem = order.orderItems?.find((item) => item?.image || item?.product);
+  return getItemImage(firstItem);
 };
+
+const imageValue = (image) => {
+  if (typeof image === 'string') return image;
+  return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
+};
+
+const firstImage = (images) => {
+  if (!Array.isArray(images) || images.length === 0) return '';
+  return images.map(imageValue).find(Boolean) || '';
+};
+
+const getItemImage = (item) => (
+  imageValue(item?.image) ||
+  imageValue(item?.product?.imageUrl) ||
+  imageValue(item?.product?.imageURL) ||
+  imageValue(item?.product?.image) ||
+  imageValue(item?.product?.thumbnail) ||
+  firstImage(item?.product?.images) ||
+  'https://via.placeholder.com/300x360?text=LUSH'
+);
 
 export default function OrderHistoryScreen({ navigation }) {
   const { user } = useAuth();
@@ -254,7 +274,7 @@ export default function OrderHistoryScreen({ navigation }) {
             {item.orderItems?.map((oi, i) => (
               <View key={`${oi.product || oi.name}-${i}`} style={styles.orderItem}>
                 <Image
-                  source={{ uri: oi.image || 'https://via.placeholder.com/80x100?text=LUSH' }}
+                  source={{ uri: getItemImage(oi) }}
                   style={styles.orderItemImage}
                   resizeMode="cover"
                 />
@@ -265,6 +285,19 @@ export default function OrderHistoryScreen({ navigation }) {
                 <Text style={styles.orderItemPrice}>LKR {Number(oi.price * oi.qty).toLocaleString()}</Text>
               </View>
             ))}
+
+            <View style={styles.divider} />
+            <Text style={styles.detailsTitle}>Payment</Text>
+            <Text style={styles.shippingText}>
+              Method: {item.paymentMethod === 'card' ? 'Credit/Debit Card' : 'Cash on Delivery'}
+            </Text>
+            {item.itemsPrice !== undefined ? (
+              <>
+                <Text style={styles.shippingText}>Subtotal: LKR {Number(item.itemsPrice || 0).toLocaleString()}</Text>
+                <Text style={styles.shippingText}>Shipping: LKR {Number(item.shippingPrice || 0).toLocaleString()}</Text>
+                <Text style={styles.shippingText}>Tax: LKR {Number(item.taxPrice || 0).toLocaleString()}</Text>
+              </>
+            ) : null}
 
             <View style={styles.divider} />
             <Text style={styles.detailsTitle}>Shipping To</Text>
