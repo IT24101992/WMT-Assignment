@@ -211,10 +211,7 @@ const adjustStockForOrderItems = async (orderItems = [], direction) => {
   }
 };
 
-// @route   POST /api/orders
-// @desc    Create new order
-// @access  Private
-router.post('/', protect, upload.single('paymentSlip'), async (req, res) => {
+const createCheckoutOrder = async (req, res) => {
   try {
     const orderItems = parseMaybeJson(req.body.orderItems, []);
     const shippingAddress = parseMaybeJson(req.body.shippingAddress, {});
@@ -344,7 +341,12 @@ router.post('/', protect, upload.single('paymentSlip'), async (req, res) => {
     console.error(err);
     res.status(500).json({ message: 'Server Error' });
   }
-});
+};
+
+// @route   POST /api/orders
+// @desc    Create new order from checkout
+// @access  Private
+router.post('/', protect, upload.single('paymentSlip'), createCheckoutOrder);
 
 // @route   GET /api/orders/myorders
 // @desc    Get logged in user orders
@@ -435,5 +437,7 @@ router.delete('/:id', protect, admin, async (req, res) => {
     res.status(500).json({ message: 'Server Error' });
   }
 });
+
+router.createCheckoutOrder = createCheckoutOrder;
 
 module.exports = router;

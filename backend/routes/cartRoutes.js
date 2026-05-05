@@ -10,15 +10,19 @@ const router = express.Router();
 
 const populateCart = (cartId) => Cart.findById(cartId).populate('items.product');
 
+//string to proper mongoDB Objects
 const toObjectIds = (ids = []) => ids
     .map((id) => id?.toString())
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
     .map((id) => new mongoose.Types.ObjectId(id));
 
+
+//find product from cart and return details
 const getProductId = (item) => {
     const product = item.product;
     return (product?._id || product)?.toString();
 };
+
 
 const getCategoryId = (category) => {
     if (!category) return '';
@@ -26,6 +30,7 @@ const getCategoryId = (category) => {
     return category.toString();
 };
 
+//different image different ways of storing
 const imageValue = (image) => {
     if (typeof image === 'string') return image;
     return image?.url || image?.src || image?.secure_url || image?.imageUrl || image?.image || '';
@@ -35,6 +40,7 @@ const firstImage = (images) => {
     if (!Array.isArray(images) || images.length === 0) return '';
     return images.map(imageValue).find(Boolean) || '';
 };
+
 
 const normalizeProduct = (product, categoryMap) => {
     if (!product) return null;
@@ -71,6 +77,7 @@ const toResponseCart = async (cart) => {
     const categories = await Category.find({ _id: { $in: categoryIds } }).lean();
     const categoryMap = new Map(categories.map((category) => [category._id.toString(), category]));
 
+    //profuct is null or broken
     obj.items = (obj.items || [])
         .filter((item) => item.product)
         .map((item) => ({
@@ -82,6 +89,7 @@ const toResponseCart = async (cart) => {
     return obj;
 };
 
+// calculating the total price in cart
 const recalculateTotal = (items) => {
     return items.reduce((total, item) => {
         const price = Number(item.product?.price);

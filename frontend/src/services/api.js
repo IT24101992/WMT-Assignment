@@ -327,7 +327,7 @@ export const clearCart = async () => {
 
 export const createOrder = async (orderData) => {
     const isFormData = orderData instanceof FormData;
-    const res = await fetch(`${BASE_URL}/orders`, {
+    const res = await fetch(`${BASE_URL}/checkout`, {
         method: 'POST',
         headers: await authHeaders(isFormData),
         body: isFormData ? orderData : JSON.stringify(orderData),
