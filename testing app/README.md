@@ -91,3 +91,22 @@ npm run test:checkout
 - Handle invalid payment method
 - Handle invalid backend/server responses
 - Build order status style keys
+
+## Order Covered Areas
+The order.test.js file tests 3 Order API endpoints
+1.Create New Order
+Endpoint: POST /api/orders
+What it tests: 
+-Creating a new order with order items, shipping address, and payment method
+-Sends a POST request with:Order items (product ID, quantity, price) / Shipping address (fullName, address, city, phoneNumber) / Payment method (COD) / Cart item IDs array
+2.Get User Orders
+Endpoint: GET /api/orders/myorders
+What it tests: 
+-Retrieving all orders for the logged-in user
+-Sends a GET request with authentication token
+3.Validation - Empty Order Items
+Endpoint: POST /api/orders
+What it tests: 
+-Backend validation when trying to create an order with no items
+-Sends a POST request with empty orderItems array
+-Tests that the API properly rejects invalid data
