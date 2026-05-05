@@ -1,3 +1,4 @@
+//Home Page CRUD
 const express = require('express');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
