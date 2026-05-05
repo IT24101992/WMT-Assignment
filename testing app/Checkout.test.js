@@ -1,6 +1,6 @@
 /**
  * Unit Tests for Checkout Screen / Order API Logic
- * Member: IT24103890 - Sandeepa 
+ * Member: IT24103890 - Sandeepa S.A.K.N
  * Component: Checkout Screen
  * Framework: Jest
  *
