@@ -5,6 +5,7 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const Cart = require('../models/Cart');
 const { protect, admin } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 const toValidQuantity = (quantity) => {
   const value = Number(quantity);
@@ -42,6 +43,17 @@ const firstImage = (images) => {
 
 const ORDER_STATUSES = ['Pending', 'Order Placed', 'Order Cancelled'];
 const PAYMENT_METHODS = ['cod', 'card'];
+
+const parseMaybeJson = (value, fallback) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value !== 'string') return value;
+
+  try {
+    return JSON.parse(value);
+  } catch (_err) {
+    return fallback;
+  }
+};
 
 const hasShippingAddress = (shippingAddress) => (
   shippingAddress?.fullName?.trim()
@@ -202,9 +214,13 @@ const adjustStockForOrderItems = async (orderItems = [], direction) => {
 // @route   POST /api/orders
 // @desc    Create new order
 // @access  Private
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, upload.single('paymentSlip'), async (req, res) => {
   try {
-    const { orderItems, shippingAddress, cartItemIds, paymentMethod = 'cod' } = req.body;
+    const orderItems = parseMaybeJson(req.body.orderItems, []);
+    const shippingAddress = parseMaybeJson(req.body.shippingAddress, {});
+    const cartItemIds = parseMaybeJson(req.body.cartItemIds, []);
+    const paymentMethod = req.body.paymentMethod || 'cod';
+    const paymentSlip = req.file ? req.file.path : req.body.paymentSlip || '';
 
     if (!Array.isArray(orderItems) || orderItems.length === 0) {
       return res.status(400).json({ message: 'No order items' });
@@ -295,6 +311,7 @@ router.post('/', protect, async (req, res) => {
       taxPrice,
       discountPrice,
       voucher: voucherSnapshot,
+      paymentSlip,
       totalPrice,
     });
 

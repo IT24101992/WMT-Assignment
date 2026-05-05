@@ -57,6 +57,10 @@ const orderSchema = new mongoose.Schema(
       amount: { type: Number, default: 0 },
       status: { type: String, default: '' },
     },
+    paymentSlip: {
+      type: String,
+      default: '',
+    },
     paymentMethod: {
       type: String,
       required: true,

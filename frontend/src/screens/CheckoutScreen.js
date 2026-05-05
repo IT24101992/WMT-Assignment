@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
-  Modal, FlatList,
+  Modal, FlatList, Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { createOrder, fetchMyOrders, removeSelectedFromCart } from '../services/api';
 import { useCart } from '../context/CartContext';
 
@@ -73,6 +74,7 @@ export default function CheckoutScreen({ route, navigation }) {
     paymentMethod: 'cod',
   });
   const [formErrors, setFormErrors] = useState({});
+  const [paymentSlipFile, setPaymentSlipFile] = useState(null);
 
   const items = cart?.items || [];
 
@@ -119,6 +121,57 @@ export default function CheckoutScreen({ route, navigation }) {
     return true;
   };
 
+  const pickPaymentSlip = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      showAlert('Permission Required', 'Please allow image access to upload a payment slip.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.85,
+    });
+
+    if (!result.canceled && result.assets?.[0]) {
+      setPaymentSlipFile(result.assets[0]);
+    }
+  };
+
+  const appendImageToFormData = async (data, fieldName, file, fallbackName) => {
+    if (!file?.uri) return;
+
+    if (Platform.OS === 'web') {
+      if (file.file) {
+        data.append(fieldName, file.file);
+        return;
+      }
+
+      const response = await fetch(file.uri);
+      const blob = await response.blob();
+      data.append(fieldName, blob, file.fileName || fallbackName);
+      return;
+    }
+
+    const localUri = file.uri;
+    const name = file.fileName || localUri.split('/').pop() || fallbackName;
+    const type = file.mimeType || 'image/jpeg';
+    data.append(fieldName, { uri: localUri, name, type });
+  };
+
+  const buildOrderFormData = async (orderData) => {
+    const data = new FormData();
+    data.append('orderItems', JSON.stringify(orderData.orderItems));
+    data.append('shippingAddress', JSON.stringify(orderData.shippingAddress));
+    data.append('cartItemIds', JSON.stringify(orderData.cartItemIds || []));
+    data.append('paymentMethod', orderData.paymentMethod);
+    await appendImageToFormData(data, 'paymentSlip', paymentSlipFile, 'payment-slip.jpg');
+    return data;
+  };
+
   const handlePlaceOrder = async () => {
     if (!validateForm()) return;
 
@@ -151,7 +204,8 @@ export default function CheckoutScreen({ route, navigation }) {
         paymentMethod: formData.paymentMethod,
       };
 
-      const result = await createOrder(orderData);
+      const payload = paymentSlipFile ? await buildOrderFormData(orderData) : orderData;
+      const result = await createOrder(payload);
 
       if (result._id) {
         const itemIdsToRemove = orderData.cartItemIds || [];
@@ -173,6 +227,7 @@ export default function CheckoutScreen({ route, navigation }) {
           paymentMethod: 'cod',
         });
         setFormErrors({});
+        setPaymentSlipFile(null);
         showAlert('Order Placed!', `Order ID: ${result._id.slice(-8).toUpperCase()}`);
         await loadOrders();
         setShowOrders(true);
@@ -349,6 +404,28 @@ export default function CheckoutScreen({ route, navigation }) {
               <Text style={styles.paymentOptionDesc}>Secure online payment (Coming Soon)</Text>
             </View>
           </TouchableOpacity>
+
+          <View style={styles.paymentSlipBox}>
+            <View style={styles.paymentSlipHeader}>
+              <View>
+                <Text style={styles.paymentSlipTitle}>Payment Slip</Text>
+                <Text style={styles.paymentSlipDesc}>Optional proof for admin review</Text>
+              </View>
+              {paymentSlipFile ? (
+                <TouchableOpacity onPress={() => setPaymentSlipFile(null)}>
+                  <Text style={styles.removeSlipText}>Remove</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            {paymentSlipFile ? (
+              <Image source={{ uri: paymentSlipFile.uri }} style={styles.paymentSlipPreview} resizeMode="cover" />
+            ) : null}
+            <TouchableOpacity style={styles.uploadSlipBtn} onPress={pickPaymentSlip}>
+              <Text style={styles.uploadSlipText}>
+                {paymentSlipFile ? 'Change Payment Slip' : 'Upload Payment Slip'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
@@ -451,6 +528,26 @@ const styles = StyleSheet.create({
   paymentOptionContent: { flex: 1 },
   paymentOptionTitle: { fontSize: 14, fontWeight: '700', color: '#1B1B1B', marginBottom: 2 },
   paymentOptionDesc: { fontSize: 12, color: '#8A8175' },
+  paymentSlipBox: {
+    borderWidth: 1, borderColor: '#E9E2D8', borderRadius: 12,
+    padding: 14, backgroundColor: '#FFFCF4',
+  },
+  paymentSlipHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  paymentSlipTitle: { fontSize: 14, fontWeight: '800', color: '#1B1B1B' },
+  paymentSlipDesc: { fontSize: 12, color: '#8A8175', marginTop: 2 },
+  removeSlipText: { color: '#B63B3B', fontSize: 12, fontWeight: '800' },
+  paymentSlipPreview: {
+    width: '100%', height: 150, borderRadius: 12,
+    backgroundColor: '#F7F3EC', marginBottom: 10,
+  },
+  uploadSlipBtn: {
+    borderWidth: 1, borderColor: '#BFA46A', borderRadius: 12,
+    paddingVertical: 12, alignItems: 'center', backgroundColor: '#FFFFFF',
+  },
+  uploadSlipText: { color: '#9F8247', fontSize: 13, fontWeight: '800' },
   footer: {
     backgroundColor: '#FFFFFF', padding: 16, paddingBottom: 28,
     borderTopWidth: 1, borderTopColor: '#E9E2D8',

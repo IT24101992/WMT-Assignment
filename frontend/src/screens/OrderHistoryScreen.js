@@ -291,6 +291,19 @@ export default function OrderHistoryScreen({ navigation }) {
             <Text style={styles.shippingText}>
               Method: {item.paymentMethod === 'card' ? 'Credit/Debit Card' : 'Cash on Delivery'}
             </Text>
+            {item.paymentSlip ? (
+              <View style={styles.paymentSlipBox}>
+                <View style={styles.paymentSlipTextBlock}>
+                  <Text style={styles.paymentSlipTitle}>Payment Slip Uploaded</Text>
+                  <Text style={styles.paymentSlipDesc}>
+                    {isAdmin ? 'Review this before accepting or cancelling.' : 'Submitted for admin review.'}
+                  </Text>
+                </View>
+                <Image source={{ uri: item.paymentSlip }} style={styles.paymentSlipImage} resizeMode="cover" />
+              </View>
+            ) : (
+              <Text style={styles.shippingText}>Payment Slip: Not uploaded</Text>
+            )}
             {item.itemsPrice !== undefined ? (
               <>
                 <Text style={styles.shippingText}>Subtotal: LKR {Number(item.itemsPrice || 0).toLocaleString()}</Text>
@@ -479,6 +492,15 @@ const styles = StyleSheet.create({
   orderItemQty: { fontSize: 12, color: '#8A8175', marginTop: 3 },
   orderItemPrice: { fontSize: 13, fontWeight: '800', color: '#BFA46A' },
   shippingText: { fontSize: 13, color: '#3B3B3B', marginBottom: 3 },
+  paymentSlipBox: {
+    marginTop: 8, marginBottom: 10, borderRadius: 14,
+    borderWidth: 1, borderColor: '#E9E2D8',
+    backgroundColor: '#FFFCF4', overflow: 'hidden',
+  },
+  paymentSlipTextBlock: { padding: 12 },
+  paymentSlipTitle: { fontSize: 13, fontWeight: '800', color: '#1B1B1B' },
+  paymentSlipDesc: { fontSize: 12, color: '#8A8175', marginTop: 3 },
+  paymentSlipImage: { width: '100%', height: 160, backgroundColor: '#F7F3EC' },
   editShippingBtn: {
     marginTop: 10, borderRadius: 12, paddingVertical: 11, alignItems: 'center',
     borderWidth: 1, borderColor: '#BFA46A', backgroundColor: '#FFFCF4',
