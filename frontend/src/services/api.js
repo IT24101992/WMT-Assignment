@@ -22,13 +22,16 @@ const getToken = async () => {
     return await AsyncStorage.getItem('userToken');
 };
 
-const authHeaders = async () => {
+const authHeaders = async (isFormData = false) => {
     const token = await getToken();
-
-    return {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
+    const headers = {};
+    if (!isFormData) {
+        headers['Content-Type'] = 'application/json';
+    }
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
 };
 
 const handleResponse = async (res) => {
@@ -201,20 +204,22 @@ export const updateProductCategory = async (id, category) => {
 };
 
 export const createCategory = async (category) => {
+    const isFormData = category instanceof FormData;
     const res = await fetch(`${BASE_URL}/categories`, {
         method: 'POST',
-        headers: await authHeaders(),
-        body: JSON.stringify(category),
+        headers: await authHeaders(isFormData),
+        body: isFormData ? category : JSON.stringify(category),
     });
 
     return handleResponse(res);
 };
 
 export const updateCategory = async (id, category) => {
+    const isFormData = category instanceof FormData;
     const res = await fetch(`${BASE_URL}/categories/${id}`, {
         method: 'PUT',
-        headers: await authHeaders(),
-        body: JSON.stringify(category),
+        headers: await authHeaders(isFormData),
+        body: isFormData ? category : JSON.stringify(category),
     });
 
     return handleResponse(res);

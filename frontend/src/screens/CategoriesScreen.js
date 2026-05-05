@@ -7,6 +7,7 @@ import {
   createCategory, deleteCategory, fetchCategories, fetchProducts, updateCategory,
 } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import * as ImagePicker from 'expo-image-picker';
 
 const CATEGORY_FALLBACKS = [
   'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=900',
@@ -20,6 +21,7 @@ const emptyCategoryForm = {
   name: '',
   description: '',
   image: '',
+  imageFile: null,
 };
 
 const showAlert = (title, message) => {
@@ -80,6 +82,7 @@ export default function CategoriesScreen({ navigation }) {
       name: category.name || '',
       description: category.description || '',
       image: category.image || '',
+      imageFile: null,
     } : emptyCategoryForm);
     setCategoryModalVisible(true);
   };
@@ -90,6 +93,19 @@ export default function CategoriesScreen({ navigation }) {
     setCategoryForm(emptyCategoryForm);
   };
 
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setCategoryForm((form) => ({ ...form, imageFile: result.assets[0] }));
+    }
+  };
+
   const saveCategory = async () => {
     if (!categoryForm.name.trim()) {
       showAlert('Missing Name', 'Please enter a category name');
@@ -98,11 +114,41 @@ export default function CategoriesScreen({ navigation }) {
 
     try {
       setSavingCategory(true);
-      const payload = {
-        name: categoryForm.name.trim(),
-        description: categoryForm.description.trim(),
-        image: categoryForm.image.trim(),
-      };
+      let payload;
+
+      if (categoryForm.imageFile) {
+        payload = new FormData();
+        payload.append('name', categoryForm.name.trim());
+        payload.append('description', categoryForm.description.trim());
+        
+        if (Platform.OS === 'web') {
+          if (categoryForm.imageFile.file) {
+            payload.append('image', categoryForm.imageFile.file);
+          } else {
+            const response = await fetch(categoryForm.imageFile.uri);
+            const blob = await response.blob();
+            payload.append('image', blob, categoryForm.imageFile.fileName || 'upload.jpg');
+          }
+        } else {
+          const localUri = categoryForm.imageFile.uri;
+          let filename = categoryForm.imageFile.fileName || localUri.split('/').pop() || 'upload.jpg';
+          if (!filename.includes('.')) filename += '.jpg';
+          const type = categoryForm.imageFile.mimeType || 'image/jpeg';
+          
+          payload.append('image', { 
+            uri: localUri, 
+            name: filename, 
+            type 
+          });
+        }
+      } else {
+        payload = {
+          name: categoryForm.name.trim(),
+          description: categoryForm.description.trim(),
+          image: categoryForm.image.trim(),
+        };
+      }
+
       if (editingCategory) {
         await updateCategory(editingCategory._id, payload);
       } else {
@@ -289,13 +335,18 @@ export default function CategoriesScreen({ navigation }) {
               value={categoryForm.description}
               onChangeText={(text) => setCategoryForm((form) => ({ ...form, description: text }))}
             />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Image URL"
-              placeholderTextColor="#8A8175"
-              value={categoryForm.image}
-              onChangeText={(text) => setCategoryForm((form) => ({ ...form, image: text }))}
-            />
+            <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
+              {(categoryForm.imageFile || categoryForm.image) ? (
+                <Image 
+                  source={{ uri: categoryForm.imageFile ? categoryForm.imageFile.uri : categoryForm.image }} 
+                  style={{ width: '100%', height: 160, borderRadius: 8, marginBottom: 12 }} 
+                  resizeMode="cover" 
+                />
+              ) : null}
+              <Text style={styles.imagePickerText}>
+                {categoryForm.imageFile || categoryForm.image ? 'Change Image' : 'Pick an Image'}
+              </Text>
+            </TouchableOpacity>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={closeCategoryModal}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
@@ -398,6 +449,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FBFAF7', borderWidth: 1, borderColor: '#E9E2D8',
     borderRadius: 12, padding: 13, color: '#1B1B1B', marginBottom: 10,
   },
+  imagePickerBtn: {
+    backgroundColor: '#F5F1EA', borderWidth: 1, borderColor: '#E9E2D8',
+    borderRadius: 12, padding: 13, alignItems: 'center', marginBottom: 10,
+  },
+  imagePickerText: { color: '#9F8247', fontWeight: '700' },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
   modalCancelBtn: {
     flex: 1, borderRadius: 12, padding: 14, alignItems: 'center',

@@ -1,6 +1,7 @@
 const express = require('express');
 const Category = require('../models/Category');
 const { protect, admin } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -34,9 +35,10 @@ router.get('/', async (req, res) => {
 // @desc    Create a category
 // @route   POST /api/categories
 // @access  Private/Admin
-router.post('/', protect, admin, async (req, res) => {
+router.post('/', protect, admin, upload.single('image'), async (req, res) => {
     try {
-        const { name, description, image, slug, isActive } = req.body;
+        const { name, description, slug, isActive } = req.body;
+        const image = req.file ? req.file.path : req.body.image;
         const normalizedName = name?.trim();
 
         if (!normalizedName) {
@@ -70,13 +72,14 @@ router.post('/', protect, admin, async (req, res) => {
 // @desc    Update a category
 // @route   PUT /api/categories/:id
 // @access  Private/Admin
-router.put('/:id', protect, admin, async (req, res) => {
+router.put('/:id', protect, admin, upload.single('image'), async (req, res) => {
     try {
         const category = await Category.findById(req.params.id);
         if (category) {
             category.name = req.body.name?.trim() || category.name;
             category.description = req.body.description || category.description;
-            category.image = req.body.image !== undefined ? req.body.image : category.image;
+            const newImage = req.file ? req.file.path : req.body.image;
+            category.image = newImage !== undefined ? newImage : category.image;
             const nextSlug = toSlug(req.body.slug || category.name);
             const slugExists = await Category.findOne({ slug: nextSlug, _id: { $ne: category._id } });
             if (slugExists) {

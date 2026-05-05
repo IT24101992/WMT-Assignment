@@ -16,9 +16,12 @@ router.post('/register', async (req, res) => {
         const { name, password } = req.body;
         const email = normalizeEmail(req.body.email);
 
+        console.log('Register attempt:', { name, email, passwordProvided: !!password });
+
         const userExists = await User.findOne({ email });
 
         if (userExists) {
+            console.log('User already exists:', email);
             return res.status(400).json({ message: 'User already exists' });
         }
 
@@ -27,6 +30,8 @@ router.post('/register', async (req, res) => {
             email,
             password,
         });
+
+        console.log('User created:', { email, userId: user._id, isActive: user.isActive });
 
         if (user) {
             res.status(201).json({
@@ -41,6 +46,7 @@ router.post('/register', async (req, res) => {
             res.status(400).json({ message: 'Invalid user data' });
         }
     } catch (error) {
+        console.error('Register error:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -53,13 +59,19 @@ router.post('/login', async (req, res) => {
         const { password } = req.body;
         const email = normalizeEmail(req.body.email);
 
+        console.log('Login attempt:', { email, passwordProvided: !!password });
+
         const user = await User.findOne({ email });
 
+        console.log('User found:', { email, exists: !!user, isActive: user?.isActive });
+
         if (user && user.isActive === false) {
+            console.log('Account deactivated:', email);
             return res.status(403).json({ message: 'This account has been deactivated' });
         }
 
         if (user && (await user.matchPassword(password))) {
+            console.log('Login successful:', email);
             res.json({
                 _id: user._id,
                 name: user.name,
@@ -69,9 +81,11 @@ router.post('/login', async (req, res) => {
                 token: generateToken(user._id),
             });
         } else {
+            console.log('Invalid credentials:', email);
             res.status(401).json({ message: 'Invalid email or password' });
         }
     } catch (error) {
+        console.error('Login error:', error);
         res.status(500).json({ message: error.message });
     }
 });

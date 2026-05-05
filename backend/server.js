@@ -13,13 +13,23 @@ const productRoutes = require('./routes/productRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 
 // Load env vars
-
 const connectDB = require('./config/db');
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// ==========================================
+// UPDATED CORS MIDDLEWARE
+// ==========================================
+app.use(cors({
+    origin: '*', // Allows all origins
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Allows all standard methods
+    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept', 'X-Requested-With'], // Allows specific headers your app might send
+}));
+
+// Explicitly handle preflight (OPTIONS) requests across all routes
+app.options(/.*/, cors());
+// ==========================================
+
 app.use(express.json());
 
 // Apply Routes
