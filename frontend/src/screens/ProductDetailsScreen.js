@@ -6,7 +6,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
-    fetchProductById,
+    fetchProductById,  
     addToCart,
     deleteProduct
 } from '../services/api';
